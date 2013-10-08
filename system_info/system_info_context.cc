@@ -6,6 +6,8 @@
 
 #include <stdlib.h>
 #if defined(TIZEN_MOBILE)
+#include <pkgmgr-info.h>
+#include <sensors.h>
 #include <system_info.h>
 #endif
 
@@ -14,37 +16,45 @@
 #include "common/picojson.h"
 #include "system_info/system_info_utils.h"
 
+namespace {
+
+const char* sSystemInfoFilePath = "/usr/etc/system-info.ini";
+
+}  // namespace
+
 DEFINE_XWALK_EXTENSION(SystemInfoContext);
 
 SystemInfoContext::SystemInfoContext(ContextAPI* api)
     : api_(api),
-      battery_(new SysInfoBattery(api)),
-      build_(new SysInfoBuild(api)),
-      cellular_network_(new SysInfoCellularNetwork(api)),
-      cpu_(new SysInfoCpu(api)),
-      device_orientation_(new SysInfoDeviceOrientation(api)),
-      display_(new SysInfoDisplay(api)),
-      locale_(new SysInfoLocale(api)),
-      sim_(new SysInfoSim(api)),
-      storage_(new SysInfoStorage(api)),
-      network_(new SysInfoNetwork(api)),
-      peripheral_(new SysInfoPeripheral(api)),
-      wifi_network_(new SysInfoWifiNetwork(api)) {
+      battery_(SysInfoBattery::GetSysInfoBattery()),
+      build_(SysInfoBuild::GetSysInfoBuild()),
+      cellular_network_(
+          SysInfoCellularNetwork::GetSysInfoCellularNetwork()),
+      cpu_(SysInfoCpu::GetSysInfoCpu()),
+      device_orientation_(
+          SysInfoDeviceOrientation::GetSysInfoDeviceOrientation()),
+      display_(SysInfoDisplay::GetSysInfoDisplay()),
+      locale_(SysInfoLocale::GetSysInfoLocale()),
+      network_(SysInfoNetwork::GetSysInfoNetwork()),
+      peripheral_(SysInfoPeripheral::GetSysInfoPeripheral()),
+      sim_(SysInfoSim::GetSysInfoSim()),
+      storage_(SysInfoStorage::GetSysInfoStorage()),
+      wifi_network_(SysInfoWifiNetwork::GetSysInfoWifiNetwork()) {
 }
 
 SystemInfoContext::~SystemInfoContext() {
-  delete wifi_network_;
-  delete peripheral_;
-  delete network_;
-  delete storage_;
-  delete sim_;
-  delete locale_;
-  delete display_;
-  delete device_orientation_;
-  delete cpu_;
-  delete cellular_network_;
-  delete build_;
-  delete battery_;
+  cpu_.StopListening(api_);
+  wifi_network_.StopListening(api_);
+  peripheral_.StopListening(api_);
+  network_.StopListening(api_);
+  storage_.StopListening(api_);
+  sim_.StopListening(api_);
+  locale_.StopListening(api_);
+  display_.StopListening(api_);
+  device_orientation_.StopListening(api_);
+  cellular_network_.StopListening(api_);
+  build_.StopListening(api_);
+  battery_.StopListening(api_);
   delete api_;
 }
 
@@ -70,29 +80,29 @@ void SystemInfoContext::HandleGetPropertyValue(const picojson::value& input,
   std::string prop = input.get("prop").to_str();
 
   if (prop == "BATTERY") {
-    battery_->Get(error, data);
+    battery_.Get(error, data);
   } else if (prop == "CPU") {
-    cpu_->Get(error, data);
+    cpu_.Get(error, data);
   } else if (prop == "STORAGE") {
-    storage_->Get(error, data);
+    storage_.Get(error, data);
   } else if (prop == "DISPLAY") {
-    display_->Get(error, data);
+    display_.Get(error, data);
   } else if (prop == "DEVICE_ORIENTATION") {
-    device_orientation_->Get(error, data);
+    device_orientation_.Get(error, data);
   } else if (prop == "BUILD") {
-    build_->Get(error, data);
+    build_.Get(error, data);
   } else if (prop == "LOCALE") {
-    locale_->Get(error, data);
+    locale_.Get(error, data);
   } else if (prop == "NETWORK") {
-    network_->Get(error, data);
+    network_.Get(error, data);
   } else if (prop == "WIFI_NETWORK") {
-    wifi_network_->Get(error, data);
+    wifi_network_.Get(error, data);
   } else if (prop == "CELLULAR_NETWORK") {
-    cellular_network_->Get(error, data);
+    cellular_network_.Get(error, data);
   } else if (prop == "SIM") {
-    sim_->Get(error, data);
+    sim_.Get(error, data);
   } else if (prop == "PERIPHERAL") {
-    peripheral_->Get(error, data);
+    peripheral_.Get(error, data);
   } else {
     system_info::SetPicoJsonObjectValue(error, "message",
         picojson::value("Not supported property " + prop));
@@ -112,29 +122,29 @@ void SystemInfoContext::HandleStartListening(const picojson::value& input) {
   std::string prop = input.get("prop").to_str();
 
   if (prop == "BATTERY") {
-    battery_->StartListening();
+    battery_.StartListening(api_);
   } else if (prop == "CPU") {
-    cpu_->StartListening();
+    cpu_.StartListening(api_);
   } else if (prop == "STORAGE") {
-    storage_->StartListening();
+    storage_.StartListening(api_);
   } else if (prop == "DISPLAY") {
-    display_->StartListening();
+    display_.StartListening(api_);
   } else if (prop == "DEVICE_ORIENTATION") {
-    device_orientation_->StartListening();
+    device_orientation_.StartListening(api_);
   } else if (prop == "BUILD") {
-    build_->StartListening();
+    build_.StartListening(api_);
   } else if (prop == "LOCALE") {
-    locale_->StartListening();
+    locale_.StartListening(api_);
   } else if (prop == "NETWORK") {
-    network_->StartListening();
+    network_.StartListening(api_);
   } else if (prop == "WIFI_NETWORK") {
-    wifi_network_->StartListening();
+    wifi_network_.StartListening(api_);
   } else if (prop == "CELLULAR_NETWORK") {
-    cellular_network_->StartListening();
+    cellular_network_.StartListening(api_);
   } else if (prop == "SIM") {
-    sim_->StartListening();
+    sim_.StartListening(api_);
   } else if (prop == "PERIPHERAL") {
-    peripheral_->StartListening();
+    peripheral_.StartListening(api_);
   }
 }
 
@@ -142,29 +152,29 @@ void SystemInfoContext::HandleStopListening(const picojson::value& input) {
   std::string prop = input.get("prop").to_str();
 
   if (prop == "BATTERY") {
-    battery_->StopListening();
+    battery_.StopListening(api_);
   } else if (prop == "CPU") {
-    cpu_->StopListening();
+    cpu_.StopListening(api_);
   } else if (prop == "STORAGE") {
-    storage_->StopListening();
+    storage_.StopListening(api_);
   } else if (prop == "DISPLAY") {
-    display_->StopListening();
+    display_.StopListening(api_);
   } else if (prop == "DEVICE_ORIENTATION") {
-    device_orientation_->StopListening();
+    device_orientation_.StopListening(api_);
   } else if (prop == "BUILD") {
-    build_->StopListening();
+    build_.StopListening(api_);
   } else if (prop == "LOCALE") {
-    locale_->StopListening();
+    locale_.StopListening(api_);
   } else if (prop == "NETWORK") {
-    network_->StopListening();
+    network_.StopListening(api_);
   } else if (prop == "WIFI_NETWORK") {
-    wifi_network_->StopListening();
+    wifi_network_.StopListening(api_);
   } else if (prop == "CELLULAR_NETWORK") {
-    cellular_network_->StopListening();
+    cellular_network_.StopListening(api_);
   } else if (prop == "SIM") {
-    sim_->StopListening();
+    sim_.StopListening(api_);
   } else if (prop == "PERIPHERAL") {
-    peripheral_->StopListening();
+    peripheral_.StopListening(api_);
   }
 }
 
@@ -262,28 +272,31 @@ void SystemInfoContext::HandleGetCapabilities() {
 
   s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_OPENGLES_TEXTURE_FORMAT, &s);
-  SetStringPropertyValue(o, "openglestextureFormat", s);
+  SetStringPropertyValue(o, "openglestextureFormat", s ? s : "");
   free(s);
 
   system_info_get_value_bool(SYSTEM_INFO_KEY_FMRADIO_SUPPORTED, &b);
   o["fmRadio"] = picojson::value(b);
 
   s = NULL;
-  system_info_get_value_string(SYSTEM_INFO_KEY_TIZEN_VERSION_NAME, &s);
-  SetStringPropertyValue(o, "platformVersion", s);
-  free(s);
-
-  s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_TIZEN_VERSION, &s);
-  SetStringPropertyValue(o, "webApiVersion", s);
+  SetStringPropertyValue(o, "platformVersion", s ? s : "");
   free(s);
 
-  // FIXME(halton): find which key reflect this prop
-  o["nativeApiVersion"] = picojson::value("Unknown");
+  std::string version =
+      system_info::GetPropertyFromFile(
+          sSystemInfoFilePath,
+          "http://tizen.org/feature/platform.web.api.version");
+  SetStringPropertyValue(o, "webApiVersion", version.c_str());
+
+  version = system_info::GetPropertyFromFile(
+                sSystemInfoFilePath,
+                "http://tizen.org/feature/platform.native.api.version");
+  SetStringPropertyValue(o, "nativeApiVersion", version.c_str());
 
   s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_PLATFORM_NAME, &s);
-  SetStringPropertyValue(o, "platformName", s);
+  SetStringPropertyValue(o, "platformName", s ? s : "");
   free(s);
 
   system_info_get_value_int(SYSTEM_INFO_KEY_CAMERA_COUNT, &i);
@@ -327,12 +340,12 @@ void SystemInfoContext::HandleGetCapabilities() {
 
   s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_CORE_CPU_ARCH, &s);
-  SetStringPropertyValue(o, "platformCoreCpuArch", s);
+  SetStringPropertyValue(o, "platformCoreCpuArch", s ? s : "");
   free(s);
 
   s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_CORE_FPU_ARCH, &s);
-  SetStringPropertyValue(o, "platformCoreFpuArch", s);
+  SetStringPropertyValue(o, "platformCoreFpuArch", s ? s : "");
   free(s);
 
   system_info_get_value_bool(SYSTEM_INFO_KEY_SIP_VOIP_SUPPORTED, &b);
@@ -340,20 +353,20 @@ void SystemInfoContext::HandleGetCapabilities() {
 
   s = NULL;
   system_info_get_value_string(SYSTEM_INFO_KEY_DEVICE_UUID, &s);
-  SetStringPropertyValue(o, "duid", s);
+  SetStringPropertyValue(o, "duid", s ? s : "");
   free(s);
 
   system_info_get_value_bool(SYSTEM_INFO_KEY_SPEECH_RECOGNITION_SUPPORTED, &b);
   o["speechRecognition"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["speechSynthesis"] = picojson::value(false);
+  b = system_info::IsExist("/usr/lib/libtts.so");
+  o["speechSynthesis"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["accelerometer"] = picojson::value(false);
+  sensor_is_supported(SENSOR_ACCELEROMETER, &b);
+  o["accelerometer"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["accelerometerWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_ACCELEROMETER, &b);
+  o["accelerometerWakeup"] = picojson::value(b);
 
   system_info_get_value_bool(SYSTEM_INFO_KEY_BAROMETER_SENSOR_SUPPORTED, &b);
   o["barometer"] = picojson::value(b);
@@ -361,53 +374,53 @@ void SystemInfoContext::HandleGetCapabilities() {
   // FIXME(halton): find which key reflect this prop
   o["barometerWakeup"] = picojson::value(false);
 
-  // FIXME(halton): find which key reflect this prop
-  o["gyroscope"] = picojson::value(false);
+  sensor_is_supported(SENSOR_GYROSCOPE, &b);
+  o["gyroscope"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["gyroscopeWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_GYROSCOPE, &b);
+  o["gyroscopeWakeup"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["magnetometer"] = picojson::value(false);
+  sensor_is_supported(SENSOR_MAGNETIC, &b);
+  o["magnetometer"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["magnetometerWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_MAGNETIC, &b);
+  o["magnetometerWakeup"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["photometer"] = picojson::value(false);
+  sensor_is_supported(SENSOR_LIGHT, &b);
+  o["photometer"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["photometerWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_LIGHT, &b);
+  o["photometerWakeup"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["proximity"] = picojson::value(false);
+  sensor_is_supported(SENSOR_PROXIMITY, &b);
+  o["proximity"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["proximityWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_PROXIMITY, &b);
+  o["proximityWakeup"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["tiltmeter"] = picojson::value(false);
+  sensor_is_supported(SENSOR_MOTION_TILT, &b);
+  o["tiltmeter"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["tiltmeterWakeup"] = picojson::value(false);
+  sensor_awake_is_supported(SENSOR_MOTION_TILT, &b);
+  o["tiltmeterWakeup"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["dataEncryption"] = picojson::value(false);
+  b = system_info::IsExist("/usr/lib/libsqlite3.so.0");
+  o["dataEncryption"] = picojson::value(b);
 
   // FIXME(halton): find which key reflect this prop
   o["graphicsAcceleration"] = picojson::value(false);
 
-  // FIXME(halton): find which key reflect this prop
-  o["push"] = picojson::value(false);
+  b = system_info::IsExist("/usr/bin/pushd");
+  o["push"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["telephony"] = picojson::value(false);
+  b = system_info::IsExist("/usr/bin/telephony-daemon");
+  o["telephony"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["telephonyMms"] = picojson::value(false);
+  system_info_get_value_bool(SYSTEM_INFO_KEY_MMS_SUPPORTED, &b);
+  o["telephonyMms"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["telephonySms"] = picojson::value(false);
+  system_info_get_value_bool(SYSTEM_INFO_KEY_SMS_SUPPORTED, &b);
+  o["telephonySms"] = picojson::value(b);
 
   // FIXME(halton): find which key reflect this prop
   o["screenSizeNormal"] = picojson::value(false);
@@ -427,28 +440,29 @@ void SystemInfoContext::HandleGetCapabilities() {
   // FIXME(halton): find which key reflect this prop
   o["autoRotation"] = picojson::value(false);
 
-  // FIXME(halton): find which key reflect this prop
-  o["shellAppWidget"] = picojson::value(false);
+  pkgmgrinfo_pkginfo_h handle;
+  if (pkgmgrinfo_pkginfo_get_pkginfo("gi2qxenosh", &handle) == PMINFO_R_OK)
+    o["shellAppWidget"] = picojson::value(true);
+  else
+    o["shellAppWidget"] = picojson::value(false);
 
-  // FIXME(halton): find which key reflect this prop
-  o["visionImageRecognition"] = picojson::value(false);
+  b = system_info::IsExist("/usr/lib/osp/libarengine.so");
+  o["visionImageRecognition"] = picojson::value(b);
+  o["visionQrcodeGeneration"] = picojson::value(b);
+  o["visionQrcodeRecognition"] = picojson::value(b);
+  o["visionFaceRecognition"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["visionQrcodeGeneration"] = picojson::value(false);
+  b = system_info::IsExist("/usr/bin/smartcard-daemon");
+  o["secureElement"] = picojson::value(b);
 
-  // FIXME(halton): find which key reflect this prop
-  o["visionQrcodeRecognition"] = picojson::value(false);
+  std::string osp_compatible =
+      system_info::GetPropertyFromFile(
+          sSystemInfoFilePath,
+          "http://tizen.org/feature/platform.native.osp_compatible");
+  o["nativeOspCompatible"] =
+      picojson::value(osp_compatible == "true" ? true : false);
 
-  // FIXME(halton): find which key reflect this prop
-  o["visionFaceRecognition"] = picojson::value(false);
-
-  // FIXME(halton): find which key reflect this prop
-  o["secureElement"] = picojson::value(false);
-
-  // FIXME(halton): find which key reflect this prop
-  o["nativeOspCompatible"] = picojson::value(false);
-
-  // FIXME(halton): find which key reflect this prop
+  // FIXME(halton): Not supported until Tizen 2.2
   o["profile"] = picojson::value("MOBILE_WEB");
 
   o["error"] = picojson::value("");

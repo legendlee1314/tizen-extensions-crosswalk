@@ -5,13 +5,13 @@
 #ifndef BLUETOOTH_BLUETOOTH_CONTEXT_H_
 #define BLUETOOTH_BLUETOOTH_CONTEXT_H_
 
-#include "common/extension_adapter.h"
-#include "common/picojson.h"
-
+#include <gio/gio.h>
 #include <map>
 #include <string>
 #include <vector>
-#include <gio/gio.h>
+
+#include "common/extension_adapter.h"
+#include "common/picojson.h"
 
 #define G_CALLBACK_1(METHOD, SENDER, ARG0)                                     \
   static void METHOD ## Thunk(SENDER sender, ARG0 res, gpointer userdata) {    \
@@ -20,16 +20,19 @@
                                                                                \
   void METHOD(SENDER, ARG0);
 
-#define G_CALLBACK_CANCELLABLE_1(METHOD, SENDER, ARG0)                                      \
-  static void METHOD ## Thunk(SENDER sender, ARG0 res, gpointer userdata) {                 \
-    ContextCancellable* context = reinterpret_cast<ContextCancellable*>(userdata);          \
-    if (context->cancellable && g_cancellable_is_cancelled(context->cancellable))           \
-      goto done;                                                                            \
-    reinterpret_cast<BluetoothContext*>(context->userdata)->METHOD(sender, res);            \
-  done:                                                                                     \
-    delete context;                                                                         \
-  }                                                                                         \
-                                                                                            \
+#define G_CALLBACK_CANCELLABLE_1(METHOD, SENDER, ARG0)                         \
+  static void METHOD ## Thunk(SENDER sender, ARG0 res, gpointer userdata) {    \
+    ContextCancellable* context =                                              \
+        reinterpret_cast<ContextCancellable*>(userdata);                       \
+    if (context->cancellable                                                   \
+        && g_cancellable_is_cancelled(context->cancellable))                   \
+      goto done;                                                               \
+    reinterpret_cast<BluetoothContext*>(context->userdata)->METHOD(sender,     \
+                                                                   res);       \
+  done:                                                                        \
+    delete context;                                                            \
+  }                                                                            \
+                                                                               \
   void METHOD(SENDER, ARG0);
 
 #define G_CALLBACK_CANCELLABLE_2(METHOD, SENDER, ARG0)                         \
@@ -42,8 +45,8 @@
       return;                                                                  \
     }                                                                          \
     std::string property = callback_data->property;                            \
-    reinterpret_cast<BluetoothContext*>(callback_data->bt_context)->METHOD(property,\
-        res);                                                                  \
+    reinterpret_cast<BluetoothContext*>(                                       \
+        callback_data->bt_context)->METHOD(property, res);                     \
     delete callback_data;                                                      \
     return;                                                                    \
   }                                                                            \
@@ -67,7 +70,8 @@ typedef struct ContextCancellable_ {
   void* userdata;
 } ContextCancellable;
 
-static ContextCancellable* CancellableWrap(GCancellable *cancellable, void* userdata) {
+static ContextCancellable* CancellableWrap(
+    GCancellable *cancellable, void* userdata) {
   ContextCancellable* context = new ContextCancellable();
 
   context->cancellable = cancellable;
@@ -79,7 +83,7 @@ static ContextCancellable* CancellableWrap(GCancellable *cancellable, void* user
 
 class BluetoothContext {
  public:
-  BluetoothContext(ContextAPI* api);
+  explicit BluetoothContext(ContextAPI* api);
   ~BluetoothContext();
 
   // ExtensionAdapter implementation.
@@ -103,6 +107,9 @@ class BluetoothContext {
   void HandleCreateBonding(const picojson::value& msg);
   void HandleDestroyBonding(const picojson::value& msg);
   void HandleRFCOMMListen(const picojson::value& msg);
+  void HandleSocketWriteData(const picojson::value& msg);
+  void HandleCloseSocket(const picojson::value& msg);
+  void HandleUnregisterServer(const picojson::value& msg);
 
   void PostMessage(picojson::value v);
   void SetSyncReply(picojson::value v);
@@ -152,12 +159,29 @@ class BluetoothContext {
   G_CALLBACK_CANCELLABLE_1(OnServiceProxyCreated, GObject*, GAsyncResult*);
   G_CALLBACK_CANCELLABLE_1(OnServiceAddRecord, GObject*, GAsyncResult*);
   G_CALLBACK_1(OnListenerAccept, GObject*, GAsyncResult*);
+  G_CALLBACK_CANCELLABLE_1(OnServiceRemoveRecord, GObject*, GAsyncResult*);
 
   static void OnSignal(GDBusProxy* proxy, gchar* sender_name, gchar* signal,
       GVariant* parameters, gpointer user_data);
 
-  static void OnDeviceSignal(GDBusProxy* proxy, gchar* sender_name, gchar* signal,
+  static void OnDeviceSignal(
+      GDBusProxy* proxy, gchar* sender_name, gchar* signal,
       GVariant* parameters, gpointer user_data);
+
+  static void OnManagerSignal(
+      GDBusProxy* proxy, gchar* sender_name, gchar* signal,
+      GVariant* parameters, gpointer user_data);
+
+  static void OnBluetoothServiceAppeared(GDBusConnection* connection,
+                                         const char* name,
+                                         const char* name_owner,
+                                         gpointer user_data);
+
+  static void OnBluetoothServiceVanished(GDBusConnection* connection,
+                                         const char* name,
+                                         gpointer user_data);
+
+  void AdapterSetPowered(const picojson::value& msg);
 
   void DeviceFound(std::string address, GVariantIter* properties);
 
@@ -171,8 +195,12 @@ class BluetoothContext {
   GDBusProxy* service_proxy_;
   int pending_listen_socket_;
 
+  std::vector<GSocket*> sockets_;
+  std::vector<GSocket*> servers_;
+
   GSocketListener *rfcomm_listener_;
 
+  guint name_watch_id_;
 #endif
 };
 
